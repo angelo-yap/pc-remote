@@ -6,3 +6,4 @@
 .clangd
 CLAUDE.md
 include/secrets.h
+.cache/clangd/index
