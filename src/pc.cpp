@@ -7,15 +7,35 @@
 #include "pc.h"
 #include "ntfy.h"
 
-static const unsigned long PC_CHECK_INTERVAL_MS = 10000;
-static const unsigned long PC_BOOT_TIMEOUT_MS = 180000;
+enum PcState{ IDLE, WAKING, RETRYING };
 
-static bool waitingForPc = false;
-static unsigned long wakeSentAt = 0;
+static const unsigned long PC_CHECK_INTERVAL_MS = 10000;
+static const unsigned long WAKE_TIMEOUT_MS = 120000;
+static const unsigned long RETRY_TIMEOUT_MS = 120000;
+
+static PcState pcState = IDLE;
+static unsigned long stateEnteredAt = 0;
 static unsigned long lastPcCheck = 0;
 
 static WiFiUDP UDP;
 static WakeOnLan WOL(UDP);
+
+static const char* stateName(PcState s){
+  switch(s){
+    case IDLE: return "IDLE";
+    case WAKING: return "WAKING";
+    case RETRYING: return "RETRYING";
+  }
+  return "UNKNOWN";
+}
+
+static void setPcState(PcState next){
+  pcState = next;
+  stateEnteredAt = millis();
+  lastPcCheck = millis();
+  Serial.print("New PC state entered: ");
+  Serial.println(stateName(next));
+}
 
 void setupWol(){
   updateWolBroadcast();
@@ -28,13 +48,17 @@ void updateWolBroadcast(){
 }
 
 void sendWake(){
+  if(pcState != IDLE){
+    Serial.println("Already waking...");
+    publishNtfy("Already waking...");
+    return;
+  }
+
   WOL.sendMagicPacket(PC_MAC);
   Serial.print("Sent Magic Packet to: ");
   Serial.println(PC_MAC);
 
-  waitingForPc = true;
-  wakeSentAt = millis();
-  lastPcCheck = millis();
+  setPcState(WAKING);
 }
 
 bool isPcUp(){
@@ -45,18 +69,32 @@ bool isPcUp(){
 }
 
 // After a wake, ping every 10 s and notify once the PC answers
-void checkPcBoot(){
-  if(!waitingForPc) return;
+void updatePcState(){
+  if(pcState == IDLE) return;
   if(millis() - lastPcCheck < PC_CHECK_INTERVAL_MS) return;
   lastPcCheck = millis();
 
   if(isPcUp()){
     Serial.println("PC is up!");
     publishNtfy("PC is up!");
-    waitingForPc = false;
-  } else if(millis() - wakeSentAt >= PC_BOOT_TIMEOUT_MS){
-    Serial.println("PC didn't come up after 3 min");
-    publishNtfy("PC didn't come up after 3 min...");
-    waitingForPc = false;
+    setPcState(IDLE);
+    return;
   }
+
+  unsigned long inState = millis() - stateEnteredAt;
+
+  if(pcState == WAKING && inState >= WAKE_TIMEOUT_MS){
+    Serial.println("No answer after two min, sending wake again...");
+    publishNtfy("No answer after two min, sending wake again...");
+    WOL.sendMagicPacket(PC_MAC);
+    setPcState(RETRYING);
+  }else if(pcState == RETRYING && inState >= RETRY_TIMEOUT_MS){
+    Serial.println("PC did not respond after 2 tries...");
+    publishNtfy("PC did not respond after 2 tries...");
+    setPcState(IDLE);
+
+    //TODO POWER CYCLE WITH SMART PLUG
+  }
+
+
 }

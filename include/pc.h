@@ -4,4 +4,4 @@ void setupWol();
 void updateWolBroadcast();
 void sendWake();
 bool isPcUp();
-void checkPcBoot();
+void updatePcState();

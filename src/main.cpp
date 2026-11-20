@@ -54,5 +54,5 @@ void loop(){
     pollNtfy();
   }
 
-  checkPcBoot();
+  updatePcState();
 }
