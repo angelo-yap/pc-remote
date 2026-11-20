@@ -6,8 +6,11 @@
 #include <ArduinoJson.h>
 #include <WiFiUdp.h>
 #include <WakeOnLan.h>
+#include <ESP32Ping.h>
 
 const int LED_PIN = 2;
+
+const String REPLY_TOPIC = String(NTFY_TOPIC) + "-status";
 
 const unsigned long WIFI_TIMEOUT_MS = 20000;
 const unsigned long POLL_INTERVAL_MS = 5000;
@@ -19,6 +22,12 @@ unsigned long lastPoll = 0;
 WiFiUDP UDP;
 WakeOnLan WOL(UDP);
 
+bool isPcUp(){
+  IPAddress pcIp;
+
+  pcIp.fromString(PC_IP);
+  return Ping.ping(pcIp, 3); 
+}
 
 void blinkLed(int times){
   for(int i = 0; i < times; i++){
@@ -27,6 +36,28 @@ void blinkLed(int times){
     digitalWrite(LED_PIN,LOW);
     delay(100);     
   }
+}
+
+void publishNtfy(const String& text){
+  WiFiClientSecure client;
+  client.setInsecure(); //TODO certificate check
+
+  HTTPClient http;
+  String url = "https://ntfy.sh/" + String(REPLY_TOPIC);
+
+  http.begin(client, url);
+
+  int code = http.POST(text);
+
+    if(code != 200){
+    Serial.print("ERROR CODE NOT 200: ");
+    Serial.println(code);
+    http.end();
+    return;
+  }
+
+  http.end();
+  
 }
 
 void handleCommand(const String& msg){
@@ -43,6 +74,13 @@ void handleCommand(const String& msg){
     Serial.print("Sent Magic Packet to: ");
     Serial.println(PC_MAC);
     blinkLed(6);
+  } else if(formattedMessage == "status") {
+    bool up = isPcUp(); 
+    String reply = up ? "PC is up..." : "PC is down...";
+
+    Serial.println(reply);
+    publishNtfy(reply);
+    blinkLed(4);
   } else {
     Serial.println("Unknown Command");
     blinkLed(2);
