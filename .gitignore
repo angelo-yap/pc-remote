@@ -10,3 +10,5 @@ include/secrets.h
 compile_commands.json
 mac/config.sh
 .DS_Store
+secrets.ini
+.vscode/settings.json

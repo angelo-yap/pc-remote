@@ -6,6 +6,7 @@
 #include "ntfy.h"
 #include "pc.h"
 #include "plug.h"
+#include "ota.h"
 
 const unsigned long POLL_INTERVAL_MS = 5000;
 const uint32_t WDT_TIMEOUT_MS = 30000;
@@ -25,6 +26,7 @@ void setup(){
   plugSetPower(true);
 
   setupWol();
+  setupOta();
 
   //watchdog
   esp_task_wdt_config_t cfg = {
@@ -53,6 +55,7 @@ void loop(){
     wifiWasDown = false;
   }
 
+  handleOta();
 
   if (millis() - lastPoll >= POLL_INTERVAL_MS) {
     lastPoll = millis();
