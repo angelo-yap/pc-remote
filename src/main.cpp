@@ -1,6 +1,7 @@
 #include <Arduino.h>
 #include <WiFi.h>
 #include "secrets.h"
+#include "ntfy_cert.h"
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
@@ -16,12 +17,17 @@ const String REPLY_TOPIC = String(NTFY_TOPIC) + "-status";
 const unsigned long WIFI_TIMEOUT_MS = 20000;
 const unsigned long POLL_INTERVAL_MS = 5000;
 const uint32_t WDT_TIMEOUT_MS = 30000;
+const unsigned long PC_CHECK_INTERVAL_MS = 10000;
+const unsigned long PC_BOOT_TIMEOUT_MS = 180000;
 
 String lastMessageId = "";
 bool firstPoll = true;
 unsigned long lastPoll = 0;
 bool wifiWasDown = false;
 unsigned long lastReconnectAttempt = 0;
+bool waitingForPc = false;
+unsigned long wakeSentAt = 0;
+unsigned long lastPcCheck = 0;
 
 WiFiUDP UDP;
 WakeOnLan WOL(UDP);
@@ -44,7 +50,7 @@ void blinkLed(int times){
 
 void publishNtfy(const String& text){
   WiFiClientSecure client;
-  client.setInsecure(); //TODO certificate check
+  client.setCACert(NTFY_ROOT_CA);
 
   HTTPClient http;
   String url = "https://ntfy.sh/" + String(REPLY_TOPIC);
@@ -79,6 +85,10 @@ void handleCommand(const String& msg){
     Serial.print("Sent Magic Packet to: ");
     Serial.println(PC_MAC);
     blinkLed(6);
+
+    waitingForPc = true;
+    wakeSentAt = millis();
+    lastPcCheck = millis();
   } else if(formattedMessage == "status") {
     bool up = isPcUp(); 
     String reply = up ? "PC is up..." : "PC is down...";
@@ -94,7 +104,7 @@ void handleCommand(const String& msg){
 
 void pollNtfy(){
   WiFiClientSecure client;
-  client.setInsecure(); //TODO certificate check
+  client.setCACert(NTFY_ROOT_CA);
 
   HTTPClient http;
   String url = "https://ntfy.sh/" + String(NTFY_TOPIC) + "/json?poll=1&since=";
@@ -202,6 +212,21 @@ void setup(){
   esp_task_wdt_add(NULL);
 }
 
+void checkPcBoot(){
+  if(millis() - lastPcCheck < PC_CHECK_INTERVAL_MS) return;
+  lastPcCheck = millis();
+
+  if(isPcUp()){
+    Serial.println("PC is up!");
+    publishNtfy("PC is up!");
+    waitingForPc = false;
+  } else if(millis() - wakeSentAt >= PC_BOOT_TIMEOUT_MS){
+    Serial.println("PC didn't come up after 3 min");
+    publishNtfy("PC didn't come up after 3 min...");
+    waitingForPc = false;
+  }
+}
+
 bool ensureWiFi(){
   if(WiFi.status() == WL_CONNECTED){
      return true;
@@ -236,5 +261,9 @@ void loop(){
   if (millis() - lastPoll >= POLL_INTERVAL_MS) {
     lastPoll = millis();
     pollNtfy();
+  }
+
+  if(waitingForPc){
+    checkPcBoot();
   }
 }
