@@ -5,6 +5,7 @@
 #include "wifi_conn.h"
 #include "ntfy.h"
 #include "pc.h"
+#include "plug.h"
 
 const unsigned long POLL_INTERVAL_MS = 5000;
 const uint32_t WDT_TIMEOUT_MS = 30000;
@@ -18,6 +19,10 @@ void setup(){
   delay(1000);
   setupLed();
   connectWiFi();
+
+  //plug
+  configTime(0, 0, "pool.ntp.org");
+  plugSetPower(true);
 
   setupWol();
 

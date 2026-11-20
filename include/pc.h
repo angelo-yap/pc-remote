@@ -5,3 +5,4 @@ void updateWolBroadcast();
 void sendWake();
 bool isPcUp();
 void updatePcState();
+void requestPowerCycle();
