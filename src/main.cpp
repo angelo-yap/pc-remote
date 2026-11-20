@@ -7,6 +7,7 @@
 #include <WiFiUdp.h>
 #include <WakeOnLan.h>
 #include <ESP32Ping.h>
+#include <esp_task_wdt.h>
 
 const int LED_PIN = 2;
 
@@ -14,10 +15,13 @@ const String REPLY_TOPIC = String(NTFY_TOPIC) + "-status";
 
 const unsigned long WIFI_TIMEOUT_MS = 20000;
 const unsigned long POLL_INTERVAL_MS = 5000;
+const uint32_t WDT_TIMEOUT_MS = 30000;
 
 String lastMessageId = "";
 bool firstPoll = true;
 unsigned long lastPoll = 0;
+bool wifiWasDown = false;
+unsigned long lastReconnectAttempt = 0;
 
 WiFiUDP UDP;
 WakeOnLan WOL(UDP);
@@ -46,6 +50,7 @@ void publishNtfy(const String& text){
   String url = "https://ntfy.sh/" + String(REPLY_TOPIC);
 
   http.begin(client, url);
+  http.setTimeout(10000);
 
   int code = http.POST(text);
 
@@ -103,7 +108,7 @@ void pollNtfy(){
   }
 
   http.begin(client, url);
-
+  http.setTimeout(10000);
   int code = http.GET();
 
   if(code != 200){
@@ -112,7 +117,7 @@ void pollNtfy(){
     http.end();
     return;
   }
-
+  
   String body = http.getString();
   http.end();
   
@@ -185,9 +190,49 @@ void setup(){
 
   WOL.calculateBroadcastAddress(WiFi.localIP(), WiFi.subnetMask());
   WOL.setRepeat(3, 100); // 3 packets sent for redundancy
+
+  //watchdog
+  esp_task_wdt_config_t cfg = {
+    .timeout_ms = WDT_TIMEOUT_MS,
+    .idle_core_mask = 0,
+    .trigger_panic = true
+  };
+
+  esp_task_wdt_reconfigure(&cfg);
+  esp_task_wdt_add(NULL);
 }
 
-void loop(){ 
+bool ensureWiFi(){
+  if(WiFi.status() == WL_CONNECTED){
+     return true;
+  } else{
+    if(millis() - lastReconnectAttempt >= 10000){
+      lastReconnectAttempt = millis();
+      Serial.println("Wi-Fi lost, reconnecting...");
+      WiFi.reconnect();
+    }
+    return false;      
+  }
+
+}
+
+void loop(){
+  esp_task_wdt_reset();
+
+  if(!ensureWiFi()){
+    wifiWasDown = true;
+    delay(1000);
+    return;
+  }
+
+  if(wifiWasDown){
+    Serial.print("Wi-Fi is back! IP: ");
+    Serial.println(WiFi.localIP());
+    WOL.calculateBroadcastAddress(WiFi.localIP(), WiFi.subnetMask());
+    wifiWasDown = false;
+  }
+
+
   if (millis() - lastPoll >= POLL_INTERVAL_MS) {
     lastPoll = millis();
     pollNtfy();
