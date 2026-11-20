@@ -6,4 +6,5 @@
 .clangd
 CLAUDE.md
 include/secrets.h
-.cache/clangd/index
+.cache/
+compile_commands.json
