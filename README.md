@@ -1,6 +1,6 @@
 # PC Remote
 
-An ESP32 that lets me turn on my gaming PC from anywhere and stream it to my MacBook, with automatic retries and a smart-plug power-cycle as a last resort when the PC won't come up.
+An ESP32 that lets me turn on my PC from anywhere and stream it to my MacBook, with automatic retries and a smart-plug power-cycle as a last resort when the PC won't come up.
 
 One click on the Mac (Dock app, Raycast or a macOS Shortcut) wakes the PC if it's off, waits until it's ready, and opens the stream in Moonlight.
 
