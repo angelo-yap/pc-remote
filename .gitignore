@@ -8,3 +8,5 @@ CLAUDE.md
 include/secrets.h
 .cache/
 compile_commands.json
+mac/config.sh
+.DS_Store
