@@ -23,6 +23,7 @@ source "$CONFIG"   # NTFY_TOPIC, PC_TS_IP, MOONLIGHT_HOST
 MOONLIGHT="/Applications/Moonlight.app/Contents/MacOS/Moonlight"
 WAIT_TIMEOUT=180       # seconds to wait for the PC to boot
 APOLLO_PORT=47989      # Apollo answers here once it's ready for Moonlight
+BOOT_SETTLE=15         # extra seconds after a fresh boot, so the GPU driver is ready for capture
 OPTIONS_LABEL="com.logi.cp-dev-mgr"
 OPTIONS_PLIST="/Library/LaunchAgents/com.logi.optionsplus.plist"
 
@@ -74,6 +75,10 @@ else
     wait_for pc_answers_ping "the PC to boot"
   fi
   wait_for apollo_ready "Apollo"
+
+  # Apollo's port opens before it can capture video (error 503 right after boot)
+  echo "Letting Windows finish starting (${BOOT_SETTLE}s)..."
+  sleep "$BOOT_SETTLE"
 fi
 
 # --- 2. Stream ---------------------------------------------------------------

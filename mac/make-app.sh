@@ -1,11 +1,11 @@
 #!/bin/bash
-# make-app.sh: build "Launch Windows.app" in ~/Applications (drag it to the Dock).
+# make-app.sh: build "Launch Windows.app" in /Applications (drag it to the Dock).
 # Re-run this if you move the project folder, since the app stores its path.
+# Rebuilding replaces the app in place, so the Dock icon keeps working.
 
 DIR="$(cd "$(dirname "$0")" && pwd)"
-APP="$HOME/Applications/Launch Windows.app"
+APP="/Applications/Launch Windows.app"
 
-mkdir -p "$HOME/Applications"
 rm -rf "$APP"
 osacompile -o "$APP" -e "do shell script quoted form of \"$DIR/launch.sh\""
 
