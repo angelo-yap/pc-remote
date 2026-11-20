@@ -1,4 +1,5 @@
 // Example secrets.h
-#define WIFI_SSID "SSID"
-#define WIFI_PASSWORD "PASSWORD"
-#define NTFY_TOPIC "YOUR-NTFY-TOPIC"
+#define WIFI_SSID "your-wifi-ssid"
+#define WIFI_PASSWORD "your-wifi-password"
+#define NTFY_TOPIC "your-ntfy-topic"
+#define PC_MAC "your-mac-address"

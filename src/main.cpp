@@ -4,14 +4,21 @@
 #include <WiFiClientSecure.h>
 #include <HTTPClient.h>
 #include <ArduinoJson.h>
+#include <WiFiUdp.h>
+#include <WakeOnLan.h>
 
 const int LED_PIN = 2;
 
 const unsigned long WIFI_TIMEOUT_MS = 20000;
 const unsigned long POLL_INTERVAL_MS = 5000;
+
 String lastMessageId = "";
 bool firstPoll = true;
 unsigned long lastPoll = 0;
+
+WiFiUDP UDP;
+WakeOnLan WOL(UDP);
+
 
 void blinkLed(int times){
   for(int i = 0; i < times; i++){
@@ -24,9 +31,22 @@ void blinkLed(int times){
 
 void handleCommand(const String& msg){
   Serial.print("Received command: ");
-  Serial.println(msg);
-  
-  blinkLed(5);
+  Serial.println(msg);  
+
+  // In case "Wake" or "wake "
+  String formattedMessage = msg;
+  formattedMessage.trim();
+  formattedMessage.toLowerCase();
+
+  if(formattedMessage == "wake"){
+    WOL.sendMagicPacket(PC_MAC);
+    Serial.print("Sent Magic Packet to: ");
+    Serial.println(PC_MAC);
+    blinkLed(6);
+  } else {
+    Serial.println("Unknown Command");
+    blinkLed(2);
+  }
 }
 
 void pollNtfy(){
@@ -122,10 +142,11 @@ void setup(){
 
   Serial.begin(115200);
   delay(1000);
-
   pinMode(LED_PIN, OUTPUT);
-
   connectWiFi();
+
+  WOL.calculateBroadcastAddress(WiFi.localIP(), WiFi.subnetMask());
+  WOL.setRepeat(3, 100); // 3 packets sent for redundancy
 }
 
 void loop(){ 
